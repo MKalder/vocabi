@@ -2,13 +2,15 @@
 
 > AI-powered contextual vocabulary learning from real-world web content.
 
+![Initial VocAbi Architecture](/assets/architecture/vocabi_architecture.svg)
+
 ## Project Status
 
-| Property     | Value           |
-| ------------ | --------------- |
-| Version      | 0.1.0           |
-| Status       | MVP Development |
-| Last Updated | 2026-05-03      |
+| Property     | Value             |
+| ------------ | ----------------- |
+| Version      | 0.2.0             |
+| Status       | VPS ollama server |
+| Last Updated | 2026-05-22        |
 
 ## Vision
 
@@ -69,7 +71,7 @@ Spaced repetition begins
 ```txt
 [ Browser Extension ]
         ↓
-[ Node.js API (Express/Fastify) ]
+[ Node.js API (Express) ]
         ↓
 [ PostgreSQL + Prisma ]
         ↓
