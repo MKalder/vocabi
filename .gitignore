@@ -4,3 +4,4 @@
 /vps
 /.vscode
 .env
+*/config.js
