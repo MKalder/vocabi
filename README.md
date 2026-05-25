@@ -6,11 +6,11 @@
 
 ## Project Status
 
-| Property     | Value             |
-| ------------ | ----------------- |
-| Version      | 0.2.0             |
-| Status       | VPS ollama server |
-| Last Updated | 2026-05-22        |
+| Property     | Value                               |
+| ------------ | ----------------------------------- |
+| Version      | 0.21.0                              |
+| Status       | API availability and Browser Plugin |
+| Last Updated | 2026-05-25                          |
 
 ## Vision
 
@@ -22,6 +22,10 @@ A personal AI-powered language learning system that enables users to:
 - Automatically create learning material using an LLM
 - Learn vocabulary through real-world usage contexts
 - Highlight already known words on websites
+
+## Workflow
+
+![VocAbi Workflow](/assets/architecture/vocabi_queue_architecture.svg)
 
 ## MVP Goal
 
