@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "VocAbi",
+  "version": "1.0",
+  "description": "Markiere ein Wort und erhalte eine Übersetzung",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        width: 320px;
+        padding: 16px;
+        font-family: sans-serif;
+      }
+      h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: #888;
+      }
+      p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <h3 id="word">Kein Wort markiert</h3>
+    <p id="result">Markiere ein Wort auf einer Webseite.</p>
+    <script>
+      chrome.storage.session.get(["translation", "word"], (data) => {
+        if (data.word) document.getElementById("word").textContent = data.word;
+        if (data.translation)
+          document.getElementById("result").textContent = data.translation;
+      });
+    </script>
+  </body>
+</html>
