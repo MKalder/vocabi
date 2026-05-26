@@ -6,11 +6,11 @@
 
 ## Project Status
 
-| Property     | Value                               |
-| ------------ | ----------------------------------- |
-| Version      | 0.21.0                              |
-| Status       | API availability and Browser Plugin |
-| Last Updated | 2026-05-25                          |
+| Property     | Value                                     |
+| ------------ | ----------------------------------------- |
+| Version      | 0.3.0                                     |
+| Status       | API, Ollama Translater and Browser Plugin |
+| Last Updated | 2026-05-26                                |
 
 ## Vision
 
@@ -23,6 +23,23 @@ A personal AI-powered language learning system that enables users to:
 - Learn vocabulary through real-world usage contexts
 - Highlight already known words on websites
 
+## MVP Goal
+
+The MVP should prove that:
+
+1. Content can be reliably collected from websites ✅
+2. Context can be meaningfully preserved ✅
+3. An LLM can generate high-quality learning material from it ✅
+4. Users can effectively learn from the generated material
+5. Previously learned words can later be recognized on websites
+
+## Current State of Developement
+
+- ✅ Browser Plugin → Icon, right click, validation, context
+- ✅ Node.js API → Queue, SSE, sanitizing, separation of concerns
+- ✅ Ollama Pipeline → Prompt, parser, sstructured DB
+- ✅ PostgreSQL → translations table
+
 ## Workflow
 
 ![VocAbi Workflow](/assets/architecture/vocabi_queue_architecture.svg)
@@ -32,15 +49,9 @@ A personal AI-powered language learning system that enables users to:
 - Worker → Ollama → done
 - Server → push result
 
-## MVP Goal
+## Job Queue
 
-The MVP should prove that:
-
-1. Content can be reliably collected from websites
-2. Context can be meaningfully preserved
-3. An LLM can generate high-quality learning material from it
-4. Users can effectively learn from the generated material
-5. Previously learned words can later be recognized on websites
+![VocAbi Job Queue](/assets/architecture/vocabi_queue_flow.svg)
 
 ## Core User Flow
 
