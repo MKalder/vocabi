@@ -14,3 +14,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         text: info.selectionText
     });
 });
+
+chrome.action.onClicked.addListener(() => {
+    chrome.tabs.create({ url: '/dashboard/dashboard.html' });
+});
