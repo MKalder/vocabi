@@ -41,7 +41,7 @@ document.addEventListener('mouseup', async (e) => {
       })
     });
     const data = await res.json();
-    tooltip.textContent = data.result;
+    waitForResult(data.jobId);
   } catch (err) {
     tooltip.textContent = 'Error';
   }
@@ -52,3 +52,23 @@ document.addEventListener('mousedown', (e) => {
     tooltip.style.display = 'none';
   }
 });
+
+function waitForResult(jobId) {
+  const eventSource = new EventSource(`${API_URL}/stream/${jobId}`);
+
+  eventSource.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    eventSource.close();
+
+    if (data.status === 'done') {
+      tooltip.textContent = data.result;
+    } else {
+      tooltip.textContent = 'Error while translating';
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    tooltip.textContent = 'Connectionerror';
+  };
+}

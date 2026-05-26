@@ -27,6 +27,11 @@ A personal AI-powered language learning system that enables users to:
 
 ![VocAbi Workflow](/assets/architecture/vocabi_queue_architecture.svg)
 
+- Plugin → POST /translate → Job in DB (pending)
+- Plugin → GET /stream/:id → SSE Connection
+- Worker → Ollama → done
+- Server → push result
+
 ## MVP Goal
 
 The MVP should prove that:
