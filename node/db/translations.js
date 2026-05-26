@@ -1,10 +1,11 @@
 import { pool } from './pool.js';
 
-export async function insertJob(text, targetLang, sourceUrl) {
+export async function insertJob(text, type, context, targetLang, sourceUrl) {
     const { rows } = await pool.query(
-        `INSERT INTO translations (input_text, target_lang, source_url, status)
-     VALUES ($1, $2, $3, 'pending') RETURNING id`,
-        [text, targetLang, sourceUrl || null]
+        `INSERT INTO translations 
+     (input_text, type, context, target_lang, source_url, status)
+     VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING id`,
+        [text, type, context || null, targetLang, sourceUrl || null]
     );
     return rows[0].id;
 }

@@ -5,3 +5,5 @@
 /.vscode
 .env
 */config.js
+*/venv
+*/icons

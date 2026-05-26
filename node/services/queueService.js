@@ -6,7 +6,7 @@ async function processNextJob() {
     if (!job) return;
 
     try {
-        const result = await translate(job.input_text, job.target_lang, job.source_url);
+        const result = await translate(job.input_text, job.type, job.context, job.target_lang);
         await markDone(job.id, result);
         console.log(`Job ${job.id} done`);
     } catch (err) {
