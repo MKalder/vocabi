@@ -33,10 +33,17 @@ export async function claimNextJob() {
     return rows[0] || null;
 }
 
-export async function markDone(id, result) {
+export async function markDone(id, parsed) {
     await pool.query(
-        `UPDATE translations SET status = 'done', result = $1 WHERE id = $2`,
-        [result, id]
+        `UPDATE translations 
+     SET status = 'done', 
+         result = $1,
+         translation = $2,
+         meaning = $3,
+         example = $4,
+         tip = $5
+     WHERE id = $6`,
+        [parsed.raw, parsed.translation, parsed.meaning, parsed.example, parsed.tip, id]
     );
 }
 
@@ -46,3 +53,4 @@ export async function markFailed(id, error) {
         [error, id]
     );
 }
+
