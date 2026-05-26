@@ -1,7 +1,12 @@
-/docs
+/docs/learning-path
+/docs/summary
 */svg
 */node_modules
 /vps
 /.vscode
 .env
 */config.js
+*/venv
+*/icons
+/demo
+*/dashboard

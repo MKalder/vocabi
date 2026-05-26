@@ -1,10 +1,11 @@
 import { pool } from './pool.js';
 
-export async function insertJob(text, targetLang, sourceUrl) {
+export async function insertJob(text, type, context, targetLang, sourceUrl) {
     const { rows } = await pool.query(
-        `INSERT INTO translations (input_text, target_lang, source_url, status)
-     VALUES ($1, $2, $3, 'pending') RETURNING id`,
-        [text, targetLang, sourceUrl || null]
+        `INSERT INTO translations 
+     (input_text, type, context, target_lang, source_url, status)
+     VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING id`,
+        [text, type, context || null, targetLang, sourceUrl || null]
     );
     return rows[0].id;
 }
@@ -32,10 +33,17 @@ export async function claimNextJob() {
     return rows[0] || null;
 }
 
-export async function markDone(id, result) {
+export async function markDone(id, parsed) {
     await pool.query(
-        `UPDATE translations SET status = 'done', result = $1 WHERE id = $2`,
-        [result, id]
+        `UPDATE translations 
+     SET status = 'done', 
+         result = $1,
+         translation = $2,
+         meaning = $3,
+         example = $4,
+         tip = $5
+     WHERE id = $6`,
+        [parsed.raw, parsed.translation, parsed.meaning, parsed.example, parsed.tip, id]
     );
 }
 
@@ -45,3 +53,4 @@ export async function markFailed(id, error) {
         [error, id]
     );
 }
+
