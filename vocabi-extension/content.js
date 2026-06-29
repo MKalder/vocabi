@@ -177,3 +177,14 @@ document.addEventListener('mousedown', (e) => {
     tooltip.style.display = 'none';
   }
 });
+
+eventSource.onmessage = (e) => {
+  const data = JSON.parse(e.data);
+  eventSource.close();
+  tooltip.textContent = data.status === 'done' ? data.result : 'Error while translating.';
+
+  // Dashboard informieren falls offen
+  if (data.status === 'done') {
+    chrome.runtime.sendMessage({ action: 'vocabAdded' });
+  }
+};
