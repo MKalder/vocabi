@@ -17,6 +17,11 @@ router.get('/', async (req, res) => {
         context,
         source_url,
         status,
+        mastered,
+        interval_days,
+        ease_factor,
+        review_count,
+        next_review,
         created_at
       FROM translations
       WHERE status = 'done'
