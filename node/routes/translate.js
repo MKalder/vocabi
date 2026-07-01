@@ -4,7 +4,7 @@ import { insertJob, getJob } from '../db/translations.js';
 const MAX_TEXT_LENGTH = 100;
 const MAX_CONTEXT_LENGTH = 500;
 const MAX_URL_LENGTH = 2000;
-const ALLOWED_LANGS = ['english', 'german', 'french', 'spanish'];
+const ALLOWED_LANGS = ['english', 'german', 'french', 'spanish', 'thai'];
 const ALLOWED_TYPES = ['vocabulary', 'phrase'];
 
 function sanitize(str, maxLength) {

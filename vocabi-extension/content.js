@@ -103,8 +103,12 @@ function extractContext(range) {
   return (sentences.find(s => s.includes(selected)) || '').trim();
 }
 
+
 async function sendToAPI(selection) {
   const { text, type, context, rect } = selection;
+
+  const stored = await chrome.storage.local.get('targetLang');
+  const targetLang = stored.targetLang || 'english';
 
   try {
     const res = await fetch(API_URL, {
@@ -114,7 +118,7 @@ async function sendToAPI(selection) {
         text,
         type,
         context,
-        targetLang: 'english',
+        targetLang,
         sourceUrl: window.location.href
       })
     });
