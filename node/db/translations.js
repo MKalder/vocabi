@@ -12,7 +12,9 @@ export async function insertJob(text, type, context, targetLang, sourceUrl) {
 
 export async function getJob(id) {
     const { rows } = await pool.query(
-        'SELECT id, status, result, error FROM translations WHERE id = $1',
+        `SELECT id, status, result, error,
+                translation, meaning, example, tip, input_text
+         FROM translations WHERE id = $1`,
         [id]
     );
     return rows[0];

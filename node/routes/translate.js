@@ -74,7 +74,15 @@ router.get('/stream/:id', async (req, res) => {
 
         if (job.status === 'done') {
             clearInterval(interval);
-            send({ status: 'done', result: job.result });
+            send({
+                status: 'done',
+                result: job.result,
+                translation: job.translation,
+                meaning: job.meaning,
+                example: job.example,
+                tip: job.tip,
+                input_text: job.input_text
+            });
             return res.end();
         }
 

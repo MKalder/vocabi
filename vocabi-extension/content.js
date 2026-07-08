@@ -1,6 +1,7 @@
 const API_URL = 'https://api.prodowner.de/translate';
+const API_BASE = 'https://api.prodowner.de';
 
-// ── CSS für Highlighting injizieren ─────────────────────────
+// ── CSS für Highlighting + Spinner injizieren ─────────────────
 const vocabiStyle = document.createElement('style');
 vocabiStyle.textContent = `
   .vocabi-highlight {
@@ -13,10 +14,61 @@ vocabiStyle.textContent = `
   .vocabi-highlight:hover {
     background: rgba(79, 70, 229, 0.3);
   }
+
+  @keyframes vocabi-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .vocabi-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #a5b4fc;
+    border-radius: 50%;
+    animation: vocabi-spin 0.7s linear infinite;
+    margin: 0 auto;
+  }
+
+  .vocabi-result {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .vocabi-result-word {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f0f0f0;
+  }
+
+  .vocabi-result-translation {
+    color: #a5b4fc;
+    font-size: 14px;
+  }
+
+  .vocabi-result-divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin: 4px 0;
+  }
+
+  .vocabi-result-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+    margin-bottom: 2px;
+  }
+
+  .vocabi-result-text {
+    font-size: 13px;
+    color: #d1d5db;
+    line-height: 1.5;
+  }
 `;
 document.head.appendChild(vocabiStyle);
 
-// ── Icon ─────────────────────────────────────────────────────
+// ── Icon ──────────────────────────────────────────────────────
 const icon = document.createElement('div');
 icon.style.cssText = `
   position: absolute;
@@ -48,6 +100,7 @@ tooltip.style.cssText = `
   font-size: 14px;
   line-height: 1.6;
   max-width: 320px;
+  min-width: 180px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   z-index: 999999;
   display: none;
@@ -82,25 +135,47 @@ function showError(message, rect) {
   }, 2000);
 }
 
-// ── SSE auf Job-Ergebnis warten ───────────────────────────────
-function waitForResult(jobId, rect) {
+// ── Spinner anzeigen ──────────────────────────────────────────
+function showSpinner(rect) {
   tooltip.style.left = `${rect.left + window.scrollX}px`;
   tooltip.style.top = `${rect.bottom + window.scrollY + 10}px`;
-  tooltip.textContent = 'Translating...';
+  tooltip.innerHTML = '<div class="vocabi-spinner"></div>';
   tooltip.style.display = 'block';
+}
+
+// ── Strukturiertes Ergebnis anzeigen ──────────────────────────
+function showResult(data, word) {
+  tooltip.innerHTML = `
+    <div class="vocabi-result">
+      <div class="vocabi-result-word">${word}</div>
+      <div class="vocabi-result-translation">${data.translation || '–'}</div>
+      <hr class="vocabi-result-divider">
+      <div class="vocabi-result-label">Bedeutung</div>
+      <div class="vocabi-result-text">${data.meaning || '–'}</div>
+      <div class="vocabi-result-label" style="margin-top:6px">Beispiel</div>
+      <div class="vocabi-result-text">${data.example || '–'}</div>
+      <div class="vocabi-result-label" style="margin-top:6px">Tipp</div>
+      <div class="vocabi-result-text">${data.tip || '–'}</div>
+    </div>
+  `;
+}
+
+// ── SSE auf Job-Ergebnis warten ───────────────────────────────
+function waitForResult(jobId, rect, word) {
+  showSpinner(rect);
 
   const eventSource = new EventSource(`${API_URL}/stream/${jobId}`);
 
   eventSource.onmessage = (e) => {
     const data = JSON.parse(e.data);
     eventSource.close();
-    tooltip.textContent = data.status === 'done' ? data.result : 'Error while translating.';
 
-    // Dashboard informieren falls offen
     if (data.status === 'done') {
+      showResult(data, word);
       chrome.runtime.sendMessage({ action: 'vocabAdded' });
-      // Cache aktualisieren damit Highlighting sofort greift
       refreshVocabCache();
+    } else {
+      tooltip.textContent = 'Error while translating.';
     }
   };
 
@@ -153,19 +228,26 @@ async function sendToAPI(selection) {
       })
     });
     const data = await res.json();
-    waitForResult(data.jobId, rect);
+    // text als word mitgeben damit showResult das Wort anzeigen kann
+    waitForResult(data.jobId, rect, text);
   } catch (err) {
     tooltip.style.display = 'block';
     tooltip.textContent = 'Error sending request.';
   }
 }
 
-// ── Word Highlighting ─────────────────────────────────────────
+// ── Alle Highlights entfernen ─────────────────────────────────
+function removeAllHighlights() {
+  document.querySelectorAll('.vocabi-highlight').forEach(mark => {
+    const text = document.createTextNode(mark.textContent);
+    mark.parentNode.replaceChild(text, mark);
+  });
+}
 
+// ── Word Highlighting ─────────────────────────────────────────
 function highlightVocabOnPage(cards) {
   if (!cards || cards.length === 0) return;
 
-  // Wörterbuch aufbauen: "speech" → card Objekt
   const vocab = {};
   cards.forEach(card => {
     if (card.front) {
@@ -176,13 +258,9 @@ function highlightVocabOnPage(cards) {
   const keys = Object.keys(vocab);
   if (keys.length === 0) return;
 
-  // Regex: alle Vokabeln als ganze Wörter matchen, case-insensitive
-  // Sonderzeichen escapen damit Phrasen wie "kick the bucket" funktionieren
   const escaped = keys.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const regex = new RegExp(`\\b(${escaped.join('|')})\\b`, 'gi');
 
-  // TreeWalker — geht nur durch reine Text-Nodes, kein HTML
-  // Das ist wichtig weil innerHTML.replace() Script-Tags und Event-Listener zerstören würde
   const walker = document.createTreeWalker(
     document.body,
     NodeFilter.SHOW_TEXT,
@@ -191,14 +269,10 @@ function highlightVocabOnPage(cards) {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
 
-        // Diese Elemente überspringen
         const skip = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT', 'CODE', 'PRE'];
         if (skip.includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
 
-        // Unsere eigenen Highlights nicht nochmal highlighten
         if (parent.classList.contains('vocabi-highlight')) return NodeFilter.FILTER_REJECT;
-
-        // Leere Nodes überspringen
         if (!node.textContent.trim()) return NodeFilter.FILTER_REJECT;
 
         return NodeFilter.FILTER_ACCEPT;
@@ -206,32 +280,27 @@ function highlightVocabOnPage(cards) {
     }
   );
 
-  // Alle passenden Text-Nodes sammeln (nicht während des Walks ersetzen — das bricht den Walker)
   const textNodes = [];
   let node;
   while ((node = walker.nextNode())) {
+    regex.lastIndex = 0;
     if (regex.test(node.textContent)) {
       textNodes.push(node);
     }
-    regex.lastIndex = 0;
   }
 
-  // Text-Nodes ersetzen
   textNodes.forEach(textNode => {
     const text = textNode.textContent;
     regex.lastIndex = 0;
-
     if (!regex.test(text)) return;
     regex.lastIndex = 0;
 
-    // Wrapper-Span erstellen
     const wrapper = document.createElement('span');
     wrapper.innerHTML = text.replace(regex, (match) => {
       const card = vocab[match.toLowerCase().trim()];
       if (!card) return match;
-      // data-Attribute für Tooltip beim Hover
-      return `<mark 
-        class="vocabi-highlight" 
+      return `<mark
+        class="vocabi-highlight"
         data-vocab-id="${card.id}"
         data-vocab-front="${card.front}"
         data-vocab-back="${card.back || ''}"
@@ -239,12 +308,11 @@ function highlightVocabOnPage(cards) {
       >${match}</mark>`;
     });
 
-    // Original Text-Node durch Wrapper ersetzen
     textNode.parentNode.replaceChild(wrapper, textNode);
   });
 }
 
-// ── Tooltip für Highlights ─────────────────────────────────────
+// ── Hover-Tooltip für Highlights ─────────────────────────────
 document.addEventListener('mouseover', (e) => {
   const mark = e.target.closest('.vocabi-highlight');
   if (!mark) return;
@@ -254,9 +322,15 @@ document.addEventListener('mouseover', (e) => {
   const meaning = mark.dataset.vocabMeaning;
 
   tooltip.innerHTML = `
-    <strong style="font-size:15px">${front}</strong><br>
-    <span style="color:#a5b4fc">${back}</span>
-    ${meaning ? `<br><span style="font-size:12px;color:#9ca3af;margin-top:4px;display:block">${meaning}</span>` : ''}
+    <div class="vocabi-result">
+      <div class="vocabi-result-word">${front}</div>
+      <div class="vocabi-result-translation">${back}</div>
+      ${meaning ? `
+        <hr class="vocabi-result-divider">
+        <div class="vocabi-result-label">Bedeutung</div>
+        <div class="vocabi-result-text">${meaning}</div>
+      ` : ''}
+    </div>
   `;
   tooltip.style.left = `${e.pageX + 12}px`;
   tooltip.style.top = `${e.pageY + 12}px`;
@@ -270,18 +344,25 @@ document.addEventListener('mouseout', (e) => {
   }
 });
 
-// ── Cache laden und Highlighting starten ──────────────────────
+// ── Highlighting initialisieren ───────────────────────────────
 async function initHighlighting() {
-  const cached = await chrome.storage.local.get('vocabCache');
-  if (cached.vocabCache && cached.vocabCache.length > 0) {
-    highlightVocabOnPage(cached.vocabCache);
+  const settings = await chrome.storage.local.get(['vocabCache', 'highlightEnabled']);
+  const enabled = settings.highlightEnabled !== false;
+
+  if (!enabled) return;
+
+  if (settings.vocabCache && settings.vocabCache.length > 0) {
+    highlightVocabOnPage(settings.vocabCache);
   }
 }
 
-// Cache nach neuer Übersetzung aktualisieren und Highlighting neu starten
+// ── Cache nach neuer Übersetzung aktualisieren ────────────────
 async function refreshVocabCache() {
   try {
-    const res = await fetch(`${API_URL.replace('/translate', '')}/vocabulary`);
+    const settings = await chrome.storage.local.get('highlightEnabled');
+    const enabled = settings.highlightEnabled !== false;
+
+    const res = await fetch(`${API_BASE}/vocabulary`);
     const vocab = await res.json();
 
     const cards = vocab.map(row => ({
@@ -294,23 +375,19 @@ async function refreshVocabCache() {
 
     await chrome.storage.local.set({ vocabCache: cards });
 
-    // Bestehende Highlights entfernen und neu aufbauen
-    document.querySelectorAll('.vocabi-highlight').forEach(mark => {
-      const text = document.createTextNode(mark.textContent);
-      mark.parentNode.replaceChild(text, mark);
-    });
+    if (!enabled) return;
 
+    removeAllHighlights();
     highlightVocabOnPage(cards);
   } catch (err) {
     console.error('VocAbi: Cache refresh fehlgeschlagen', err);
   }
 }
 
-// ── Event Listener ────────────────────────────────────────────
-
+// ── Event Listener: Maus-Selektion ───────────────────────────
 document.addEventListener('mouseup', (e) => {
   if (icon.contains(e.target)) return;
-  if (e.target.closest('.vocabi-highlight')) return; // Highlight-Klick nicht als Selektion werten
+  if (e.target.closest('.vocabi-highlight')) return;
 
   const selectedText = window.getSelection().toString().trim();
 
@@ -341,6 +418,7 @@ document.addEventListener('mouseup', (e) => {
   showIcon(rect);
 });
 
+// ── Event Listener: Icon-Klick ────────────────────────────────
 icon.addEventListener('click', () => {
   if (!savedSelection) return;
   icon.style.display = 'none';
@@ -348,20 +426,37 @@ icon.addEventListener('click', () => {
   sendToAPI(savedSelection);
 });
 
+// ── Event Listener: Messages ──────────────────────────────────
 chrome.runtime.onMessage.addListener((message) => {
-  if (message.action !== 'translate') return;
-  if (!savedSelection) return;
-  sendToAPI(savedSelection);
+  if (message.action === 'translate') {
+    if (!savedSelection) return;
+    sendToAPI(savedSelection);
+    return;
+  }
+
+  if (message.action === 'setHighlight') {
+    if (message.enabled) {
+      initHighlighting();
+    } else {
+      removeAllHighlights();
+    }
+    return;
+  }
 });
 
+// ── Event Listener: Klick außerhalb schließt UI ───────────────
 document.addEventListener('mousedown', (e) => {
-  if (!icon.contains(e.target) && !tooltip.contains(e.target) && !e.target.closest('.vocabi-highlight')) {
+  if (
+    !icon.contains(e.target) &&
+    !tooltip.contains(e.target) &&
+    !e.target.closest('.vocabi-highlight')
+  ) {
     icon.style.display = 'none';
     tooltip.style.display = 'none';
   }
 });
 
-// ── Start: Highlighting initialisieren ────────────────────────
+// ── Start ─────────────────────────────────────────────────────
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initHighlighting);
 } else {
