@@ -2,19 +2,17 @@
 
 > AI-powered contextual vocabulary learning from real-world web content.
 
-![Initial VocAbi Architecture](/assets/architecture/vocabi_architecture.svg)
-
 ## Project Status
 
 | Property     | Value                                     |
 | ------------ | ----------------------------------------- |
 | Version      | 0.3.0                                     |
 | Status       | API, Ollama Translater and Browser Plugin |
-| Last Updated | 2026-05-26                                |
+| Last Updated | 2026-10-01                                |
 
 ## Vision
 
-A personal AI-powered language learning system that enables users to:
+A personal local AI-powered language learning system that enables users to:
 
 - Highlight content directly from the internet
 - Save words, sentences, and paragraphs
@@ -29,7 +27,7 @@ The MVP should prove that:
 
 1. Content can be reliably collected from websites ✅
 2. Context can be meaningfully preserved ✅
-3. An LLM can generate high-quality learning material from it ✅
+3. An LLM can generate quality learning material from it ✅
 4. Users can effectively learn from the generated material
 5. Previously learned words can later be recognized on websites
 
@@ -42,8 +40,6 @@ The MVP should prove that:
 
 ## Workflow
 
-![VocAbi Workflow](/assets/architecture/vocabi_queue_architecture.svg)
-
 - Plugin → POST /translate → Job in DB (pending)
 - Plugin → GET /stream/:id → SSE Connection
 - Worker → Ollama → done
@@ -51,7 +47,7 @@ The MVP should prove that:
 
 ## Job Queue
 
-![VocAbi Job Queue](/assets/architecture/vocabi_queue_flow.svg)
+![VocAbi Job Queue](/readme-assets/architecture/vocabi_queue_flow.svg)
 
 ## Core User Flow
 
