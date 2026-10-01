@@ -4,7 +4,7 @@ import { insertJob, getJob } from '../db/translations.js';
 const MAX_TEXT_LENGTH = 100;
 const MAX_CONTEXT_LENGTH = 500;
 const MAX_URL_LENGTH = 2000;
-const ALLOWED_LANGS = ['english', 'german', 'french', 'spanish'];
+const ALLOWED_LANGS = ['english', 'german', 'french', 'spanish', 'thai'];
 const ALLOWED_TYPES = ['vocabulary', 'phrase'];
 
 function sanitize(str, maxLength) {
@@ -74,7 +74,15 @@ router.get('/stream/:id', async (req, res) => {
 
         if (job.status === 'done') {
             clearInterval(interval);
-            send({ status: 'done', result: job.result });
+            send({
+                status: 'done',
+                result: job.result,
+                translation: job.translation,
+                meaning: job.meaning,
+                example: job.example,
+                tip: job.tip,
+                input_text: job.input_text
+            });
             return res.end();
         }
 

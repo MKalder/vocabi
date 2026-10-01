@@ -9,6 +9,7 @@ router.get('/', async (req, res) => {
       SELECT 
         id,
         input_text,
+        target_lang,
         translation,
         meaning,
         example,
@@ -104,3 +105,45 @@ router.patch('/:id/review', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+router.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            'DELETE FROM translations WHERE id = $1 RETURNING id',
+            [id]
+        );
+
+        if (!result.rows.length) {
+            return res.status(404).json({ error: 'Not found' });
+        }
+
+        res.json({ deleted: true, id: result.rows[0].id });
+    } catch (err) {
+        console.error('DELETE /vocabulary/:id error:', err.message);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/sm2-stats', async (req, res) => {
+    try {
+        const { rows } = await pool.query(`
+      SELECT
+        ROUND(AVG(ease_factor)::numeric, 2)    AS avg_ease_factor,
+        ROUND(AVG(interval_days)::numeric, 1)  AS avg_interval_days,
+        ROUND(AVG(review_count)::numeric, 1)   AS avg_review_count,
+        COUNT(*) FILTER (WHERE mastered = true)  AS mastered_count,
+        COUNT(*) FILTER (WHERE review_count = 0) AS never_reviewed_count,
+        COUNT(*) FILTER (WHERE review_count > 0) AS in_progress_count
+      FROM translations
+      WHERE status = 'done'
+    `);
+        res.json(rows[0]);
+    } catch (err) {
+        console.error('GET /vocabulary/sm2-stats error:', err.message);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+

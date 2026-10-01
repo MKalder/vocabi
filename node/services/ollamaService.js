@@ -36,10 +36,10 @@ Instructions:
 - Follow the exact structure below
 
 Required format:
-**Translation:** [translation]
-**Meaning:** [2-3 short learner-friendly sentences]
-**Example:** [one natural sentence using the word in context]
-**Tip:** [one short mnemonic, etymology, or usage hint]
+**Translation:** [translation in ${targetLang}]
+**Meaning:** [2-3 short learner-friendly sentences in ${targetLang}]
+**Example:** [one natural sentence using the word in ${context} and in ${targetLang}]
+**Tip:** [one short mnemonic, etymology, or usage hint in ${targetLang}]
 `;
 
     const response = await fetch(config.ollamaUrl, {

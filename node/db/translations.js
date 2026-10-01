@@ -12,7 +12,9 @@ export async function insertJob(text, type, context, targetLang, sourceUrl) {
 
 export async function getJob(id) {
     const { rows } = await pool.query(
-        'SELECT id, status, result, error FROM translations WHERE id = $1',
+        `SELECT id, status, result, error,
+                translation, meaning, example, tip, input_text
+         FROM translations WHERE id = $1`,
         [id]
     );
     return rows[0];
@@ -53,4 +55,30 @@ export async function markFailed(id, error) {
         [error, id]
     );
 }
+
+export async function recoverStuckJobs() {
+    const { rows } = await pool.query(`
+    UPDATE translations 
+    SET status = 'pending' 
+    WHERE status = 'processing'
+    RETURNING id
+  `);
+    return rows.length;
+}
+
+export async function failStuckProcessingJobs(timeoutMinutes = 3) {
+    const { rows } = await pool.query(
+        `UPDATE translations 
+     SET status = 'failed', 
+         error = 'Timeout: job stuck in processing'
+     WHERE status = 'processing' 
+       AND created_at < NOW() - ($1 || ' minutes')::interval
+     RETURNING id`,
+        [timeoutMinutes]
+    );
+    return rows.length;
+}
+
+
+
 

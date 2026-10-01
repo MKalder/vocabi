@@ -1,4 +1,4 @@
-import { claimNextJob, markDone, markFailed } from '../db/translations.js';
+import { claimNextJob, markDone, markFailed, recoverStuckJobs, failStuckProcessingJobs } from '../db/translations.js';
 import { translate } from './ollamaService.js';
 import { parseOllamaResult } from './parserService.js';
 
@@ -17,10 +17,20 @@ async function processNextJob() {
     }
 }
 
-export function startWorker() {
+export async function startWorker() {
+    const recovered = await recoverStuckJobs();
+    if (recovered > 0) {
+        console.log(`${recovered} hängengebliebene Jobs beim Start zurückgesetzt`);
+    }
+
     setInterval(processNextJob, 2000);
+
+    setInterval(async () => {
+        const failedCount = await failStuckProcessingJobs(5);
+        if (failedCount > 0) {
+            console.log(`${failedCount} Jobs wegen Timeout auf failed gesetzt`);
+        }
+    }, 120000);
+
     console.log('Worker started');
 }
-
-
-
