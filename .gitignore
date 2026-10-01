@@ -1,12 +1,16 @@
-/docs/learning-path
-/docs/authentification
-*/svg
-*/node_modules
-/vps
-/.vscode
+# Env
 .env
 */config.js
+
+
+# Folder
+assets
+docs
+vps
+.vscode
+*/svg
+*/node_modules
 */venv
 */icons
-/demo
+demo
 */dashboard
