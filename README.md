@@ -47,7 +47,7 @@ The MVP should prove that:
 
 ## Job Queue
 
-![VocAbi Job Queue](/readme-assets/architecture/vocabi_queue_flow.svg)
+![VocAbi Job Queue](/readme-assets/architecture/vocabi_queue_architecture.svg)
 
 ## Core User Flow
 
