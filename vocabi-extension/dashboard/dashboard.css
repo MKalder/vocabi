@@ -802,6 +802,10 @@ th {
     color: var(--color-text);
 }
 
+[hidden] {
+    display: none !important;
+}
+
 /* ── Flashcards: Review Buttons ──────────────────────────── */
 .review-buttons {
     display: grid;

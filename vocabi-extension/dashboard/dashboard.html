@@ -271,9 +271,21 @@
                     <span>Lösung</span>
                     <span id="flashLanguage">–</span>
                   </div>
+                  <button class="btn ghost" id="backToFrontBtn" type="button">
+                    Zurück
+                  </button>
                   <div class="flash-word" id="flashBack">
                     Noch keine Antwort
                   </div>
+                  <!-- <button
+                    class="btn ghost"
+                    id="detailsBtn"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="flashDetails"
+                  >
+                    Kontext und Erklärung anzeigen
+                  </button>
                   <div class="flash-details">
                     <p class="flash-detail-row">
                       <strong>Bedeutung:</strong>
@@ -286,7 +298,35 @@
                     <p class="flash-detail-row">
                       <strong>Tipp:</strong> <span id="flashTip">–</span>
                     </p>
+                  </div> -->
+
+                  <button
+                    class="btn ghost"
+                    id="detailsBtn"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="flashDetails"
+                  >
+                    Kontext und Erklärung anzeigen
+                  </button>
+
+                  <div class="flash-details" id="flashDetails" hidden>
+                    <p class="flash-detail-row">
+                      <strong>Bedeutung:</strong>
+                      <span id="flashMeaning">–</span>
+                    </p>
+
+                    <p class="flash-detail-row">
+                      <strong>Beispiel:</strong>
+                      <span id="flashExample">–</span>
+                    </p>
+
+                    <p class="flash-detail-row">
+                      <strong>Tipp:</strong>
+                      <span id="flashTip">–</span>
+                    </p>
                   </div>
+
                   <div class="review-buttons">
                     <button class="btn hard" data-review="hard">Schwer</button>
                     <button class="btn medium" data-review="good">Gut</button>

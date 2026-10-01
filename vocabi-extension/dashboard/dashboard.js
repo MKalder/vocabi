@@ -1,4 +1,4 @@
-const API_BASE = 'https://api.prodowner.de';
+const API_BASE = "https://api.prodowner.de";
 
 // ── State ─────────────────────────────────────────────────────
 const state = {
@@ -10,13 +10,14 @@ const state = {
     currentPanel: "dashboard",
     currentCardIndex: 0,
     cards: [],
+    autoFlipTimer: null,
     filters: {
         status: "all",
         type: "all",
         lang: "all",
-        search: ""
+        search: "",
     },
-    selectedIds: new Set()
+    selectedIds: new Set(),
 };
 
 // ── Hilfsfunktionen ───────────────────────────────────────────
@@ -34,13 +35,14 @@ const now = () => new Date();
 
 function langLabel(lang) {
     const map = {
-        english: 'Englisch',
-        german: 'Deutsch',
-        deutsch: 'Deutsch',
-        french: 'Französisch',
-        spanish: 'Spanisch',
-        thai: 'Thailändisch'
+        english: "Englisch",
+        german: "Deutsch",
+        deutsch: "Deutsch",
+        french: "Französisch",
+        spanish: "Spanisch",
+        thai: "Thailändisch",
     };
+
     return map[lang] || lang;
 }
 
@@ -56,6 +58,18 @@ function statusClass(card) {
     return "";
 }
 
+function resetFlashcardView() {
+    if (state.autoFlipTimer) {
+        clearTimeout(state.autoFlipTimer);
+        state.autoFlipTimer = null;
+    }
+
+    el("#flashCard").classList.remove("flipped");
+    el("#flashDetails").hidden = true;
+    el("#detailsBtn").setAttribute("aria-expanded", "false");
+    el("#detailsBtn").textContent = "Kontext und Erklärung anzeigen";
+}
+
 // ── State persistieren ────────────────────────────────────────
 function persistState() {
     chrome.storage.local.set({
@@ -64,38 +78,47 @@ function persistState() {
         autoFlip: state.autoFlip,
         flashLang: state.flashLang,
         highlightEnabled: state.highlightEnabled,
-        currentPanel: state.currentPanel
+        currentPanel: state.currentPanel,
     });
 }
 
 // ── Beim Start: State aus Storage laden ───────────────────────
 async function loadPersistedState() {
     const data = await chrome.storage.local.get([
-        'theme', 'dueOnly', 'autoFlip', 'flashLang',
-        'targetLang', 'highlightEnabled', 'vocabCache', 'currentPanel'
+        "theme",
+        "dueOnly",
+        "autoFlip",
+        "flashLang",
+        "targetLang",
+        "highlightEnabled",
+        "vocabCache",
+        "currentPanel",
     ]);
 
-    // State wiederherstellen
     if (data.theme) state.theme = data.theme;
     if (data.dueOnly !== undefined) state.dueOnly = data.dueOnly;
     if (data.autoFlip !== undefined) state.autoFlip = data.autoFlip;
     if (data.flashLang) state.flashLang = data.flashLang;
-    if (data.highlightEnabled !== undefined) state.highlightEnabled = data.highlightEnabled;
+    if (data.highlightEnabled !== undefined) {
+        state.highlightEnabled = data.highlightEnabled;
+    }
     if (data.currentPanel) state.currentPanel = data.currentPanel;
 
-
-    // Theme auf HTML-Element setzen
     document.documentElement.setAttribute("data-theme", state.theme);
 
-    // UI-Elemente visuell korrekt setzen
     el("#dueOnlySwitch").classList.toggle("active", state.dueOnly);
     el("#autoFlipSwitch").classList.toggle("active", state.autoFlip);
     el("#darkSwitch").classList.toggle("active", state.theme === "dark");
-    el("#highlightSwitch").classList.toggle("active", state.highlightEnabled);
+    el("#highlightSwitch").classList.toggle(
+        "active",
+        state.highlightEnabled,
+    );
     el("#flashLangSelect").value = state.flashLang || "all";
-    if (data.targetLang) el("#targetLangSelect").value = data.targetLang;
 
-    // Cache sofort rendern falls vorhanden (Stale-While-Revalidate)
+    if (data.targetLang) {
+        el("#targetLangSelect").value = data.targetLang;
+    }
+
     if (data.vocabCache && data.vocabCache.length > 0) {
         state.cards = data.vocabCache;
         rerender();
@@ -104,54 +127,59 @@ async function loadPersistedState() {
     setPanel(state.currentPanel);
 }
 
-// ── Vokabeln laden (Stale-While-Revalidate) ───────────────────
+// ── Vokabeln laden ────────────────────────────────────────────
 async function loadVocabulary() {
     let cachedCards = null;
 
-    // Schritt 1: Cache sofort anzeigen
     try {
-        const cached = await chrome.storage.local.get('vocabCache');
+        const cached = await chrome.storage.local.get("vocabCache");
+
         if (cached.vocabCache && cached.vocabCache.length > 0) {
             cachedCards = cached.vocabCache;
             state.cards = cachedCards;
             rerender();
         }
     } catch (err) {
-        console.error('Cache lesen fehlgeschlagen:', err);
+        console.error("Cache lesen fehlgeschlagen:", err);
     }
 
-    // Schritt 2: Frische Daten im Hintergrund holen
     try {
         const res = await fetch(`${API_BASE}/vocabulary`);
+
+        if (!res.ok) {
+            throw new Error(`Vokabeln laden fehlgeschlagen: ${res.status}`);
+        }
+
         const vocab = await res.json();
 
-        state.cards = vocab.map(row => ({
+        state.cards = vocab.map((row) => ({
             id: row.id,
             front: row.input_text,
-            back: row.translation || '–',
-            context: row.context || '',
+            back: row.translation || "–",
+            context: row.context || "",
             language: row.target_lang,
             tag: row.type,
-            note: row.meaning || '',
-            example: row.example || '',
-            tip: row.tip || '',
+            note: row.meaning || "",
+            example: row.example || "",
+            tip: row.tip || "",
             addedAt: row.created_at,
             mastered: row.mastered || false,
             interval: row.interval_days || 1,
             ease_factor: row.ease_factor || 2.5,
             review_count: row.review_count || 0,
             dueAt: row.next_review || row.created_at,
-            reviews: row.review_count || 0
+            reviews: row.review_count || 0,
         }));
 
-        // Schritt 3: Cache aktualisieren
         await chrome.storage.local.set({ vocabCache: state.cards });
 
         rerender();
     } catch (err) {
-        console.error('Fehler beim Laden der Vokabeln:', err);
-        // Falls API nicht erreichbar → gecachte Daten bleiben sichtbar
-        if (!cachedCards) rerender();
+        console.error("Fehler beim Laden der Vokabeln:", err);
+
+        if (!cachedCards) {
+            rerender();
+        }
     }
 }
 
@@ -159,41 +187,74 @@ async function loadVocabulary() {
 async function loadSm2Stats() {
     try {
         const res = await fetch(`${API_BASE}/vocabulary/sm2-stats`);
+
+        if (!res.ok) {
+            throw new Error(`Statistiken laden fehlgeschlagen: ${res.status}`);
+        }
+
         const stats = await res.json();
-        el("#statAvgEase").textContent = stats.avg_ease_factor || '–';
-        el("#statAvgInterval").textContent = stats.avg_interval_days ? `${stats.avg_interval_days}d` : '–';
-        el("#statMastered").textContent = stats.mastered_count || '0';
-        el("#statNeverReviewed").textContent = stats.never_reviewed_count || '0';
+
+        el("#statAvgEase").textContent = stats.avg_ease_factor || "–";
+        el("#statAvgInterval").textContent = stats.avg_interval_days
+            ? `${stats.avg_interval_days}d`
+            : "–";
+        el("#statMastered").textContent = stats.mastered_count || "0";
+        el("#statNeverReviewed").textContent =
+            stats.never_reviewed_count || "0";
     } catch (err) {
-        console.error('Fehler beim Laden der SM-2 Stats:', err);
+        console.error("Fehler beim Laden der SM-2 Stats:", err);
     }
 }
 
 // ── Filter ────────────────────────────────────────────────────
 function filteredCards() {
-    return state.cards.filter(card => {
-        // Status-Filter
+    return state.cards.filter((card) => {
         if (state.filters.status !== "all") {
-            const s = statusOf(card).toLowerCase();
-            const map = { new: "neu", learning: "lernen", mastered: "markiert" };
-            if (s !== map[state.filters.status] && s !== state.filters.status) return false;
-        }
-        // Sprach-Filter
-        if (state.filters.lang !== "all") {
-            const lang = card.language;
-            if (state.filters.lang === 'german') {
-                if (lang !== 'german' && lang !== 'deutsch') return false;
-            } else {
-                if (lang !== state.filters.lang) return false;
+            const status = statusOf(card).toLowerCase();
+            const map = {
+                new: "neu",
+                learning: "lernen",
+                mastered: "markiert",
+            };
+
+            if (
+                status !== map[state.filters.status] &&
+                status !== state.filters.status
+            ) {
+                return false;
             }
         }
-        // Typ-Filter
-        if (state.filters.type !== "all" && card.tag !== state.filters.type) return false;
-        // Suche
-        if (state.filters.search) {
-            const q = state.filters.search.toLowerCase();
-            if (!card.front.toLowerCase().includes(q) && !card.back.toLowerCase().includes(q)) return false;
+
+        if (state.filters.lang !== "all") {
+            const lang = card.language;
+
+            if (state.filters.lang === "german") {
+                if (lang !== "german" && lang !== "deutsch") {
+                    return false;
+                }
+            } else if (lang !== state.filters.lang) {
+                return false;
+            }
         }
+
+        if (
+            state.filters.type !== "all" &&
+            card.tag !== state.filters.type
+        ) {
+            return false;
+        }
+
+        if (state.filters.search) {
+            const query = state.filters.search.toLowerCase();
+
+            if (
+                !card.front.toLowerCase().includes(query) &&
+                !card.back.toLowerCase().includes(query)
+            ) {
+                return false;
+            }
+        }
+
         return true;
     });
 }
@@ -201,16 +262,23 @@ function filteredCards() {
 // ── Flashcard Queue ───────────────────────────────────────────
 const nextQueue = () =>
     state.cards
-        .filter(card => {
-            if (state.dueOnly && new Date(card.dueAt) > now()) return false;
+        .filter((card) => {
+            if (state.dueOnly && new Date(card.dueAt) > now()) {
+                return false;
+            }
+
             if (state.flashLang !== "all") {
                 const lang = card.language;
+
                 if (state.flashLang === "german") {
-                    if (lang !== "german" && lang !== "deutsch") return false;
-                } else {
-                    if (lang !== state.flashLang) return false;
+                    if (lang !== "german" && lang !== "deutsch") {
+                        return false;
+                    }
+                } else if (lang !== state.flashLang) {
+                    return false;
                 }
             }
+
             return true;
         })
         .sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
@@ -219,31 +287,58 @@ const nextQueue = () =>
 function setPanel(name) {
     state.currentPanel = name;
     persistState();
-    els(".panel").forEach((p) =>
-        p.classList.toggle("active", p.id === `panel-${name}`)
-    );
-    els(".nav button").forEach((btn) =>
-        btn.classList.toggle("active", btn.dataset.panel === name)
-    );
+
+    els(".panel").forEach((panel) => {
+        panel.classList.toggle("active", panel.id === `panel-${name}`);
+    });
+
+    els(".nav button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.panel === name);
+    });
+
     const titles = {
-        dashboard: ["Dashboard", "Behalte Fortschritt, Lernstand und nächste Wiederholungen im Blick."],
-        vocab: ["Vokabeln", "Erfasse neue Karten und prüfe Hinzufügedatum, Status und Reviews."],
-        flashcards: ["Flash Cards", "Direkter Zugang zum Spaced-Repetition-Lernmodus."],
-        settings: ["Settings", "Passe Ansicht und Wiederholungslogik an."],
+        dashboard: [
+            "Dashboard",
+            "Behalte Fortschritt, Lernstand und nächste Wiederholungen im Blick.",
+        ],
+        vocab: [
+            "Vokabeln",
+            "Erfasse neue Karten und prüfe Hinzufügedatum, Status und Reviews.",
+        ],
+        flashcards: [
+            "Flash Cards",
+            "Direkter Zugang zum Spaced-Repetition-Lernmodus.",
+        ],
+        settings: [
+            "Settings",
+            "Passe Ansicht und Wiederholungslogik an.",
+        ],
     };
+
     el("#pageTitle").textContent = titles[name][0];
     el("#pageSubtitle").textContent = titles[name][1];
-    if (window.innerWidth < 760) el("#nav").classList.remove("open");
-    if (name === "flashcards") renderFlashcard();
-    if (name === "settings") loadSm2Stats();
+
+    if (window.innerWidth < 760) {
+        el("#nav").classList.remove("open");
+    }
+
+    if (name === "flashcards") {
+        renderFlashcard();
+    }
+
+    if (name === "settings") {
+        loadSm2Stats();
+    }
 }
 
 // ── Render: Dashboard ─────────────────────────────────────────
 function renderDashboard() {
     const total = state.cards.length;
-    const done = state.cards.filter((c) => c.mastered).length;
+    const done = state.cards.filter((card) => card.mastered).length;
     const learning = total - done;
-    const due = state.cards.filter((c) => new Date(c.dueAt) <= now()).length;
+    const due = state.cards.filter(
+        (card) => new Date(card.dueAt) <= now(),
+    ).length;
 
     el("#kpiTotal").textContent = total;
     el("#kpiDone").textContent = done;
@@ -256,15 +351,20 @@ function renderDashboard() {
         .slice(0, 4);
 
     el("#recentList").innerHTML = recent.length
-        ? recent.map(card => `
-            <div class="word-row">
-              <span class="status-dot ${statusClass(card)}"></span>
-              <div class="word-main">
-                <strong>${card.front} — ${card.back}</strong>
-                <span>Hinzugefügt am ${fmtDate(card.addedAt)}</span>
-              </div>
-              <span class="tag">${statusOf(card)}</span>
-            </div>`).join("")
+        ? recent
+            .map(
+                (card) => `
+                    <div class="word-row">
+                        <span class="status-dot ${statusClass(card)}"></span>
+                        <div class="word-main">
+                            <strong>${card.front} — ${card.back}</strong>
+                            <span>Hinzugefügt am ${fmtDate(card.addedAt)}</span>
+                        </div>
+                        <span class="tag">${statusOf(card)}</span>
+                    </div>
+                `,
+            )
+            .join("")
         : '<div class="empty">Noch keine Vokabeln vorhanden.</div>';
 
     const dueItems = [...state.cards]
@@ -272,15 +372,20 @@ function renderDashboard() {
         .slice(0, 4);
 
     el("#dueList").innerHTML = dueItems.length
-        ? dueItems.map(card => `
-            <div class="word-row">
-              <span class="status-dot ${statusClass(card)}"></span>
-              <div class="word-main">
-                <strong>${card.front}</strong>
-                <span>Nächste Review: ${fmtDate(card.dueAt)}</span>
-              </div>
-              <span class="tag">${card.interval || 0}d</span>
-            </div>`).join("")
+        ? dueItems
+            .map(
+                (card) => `
+                    <div class="word-row">
+                        <span class="status-dot ${statusClass(card)}"></span>
+                        <div class="word-main">
+                            <strong>${card.front}</strong>
+                            <span>Nächste Review: ${fmtDate(card.dueAt)}</span>
+                        </div>
+                        <span class="tag">${card.interval || 0}d</span>
+                    </div>
+                `,
+            )
+            .join("")
         : '<div class="empty">Noch keine Reviews geplant.</div>';
 }
 
@@ -291,28 +396,47 @@ function renderTable() {
     el("#vocabCount").textContent = `${cards.length} Einträge`;
 
     const hasSelected = state.selectedIds.size > 0;
+
     el("#bulkActions").style.display = hasSelected ? "flex" : "none";
     el("#bulkCount").textContent = `${state.selectedIds.size} ausgewählt`;
 
     el("#vocabTable").innerHTML = cards.length
-        ? cards.map(card => `
-            <tr>
-              <td>
-                <input type="checkbox"
-                  class="row-checkbox"
-                  data-id="${card.id}"
-                  ${state.selectedIds.has(card.id) ? "checked" : ""}
-                />
-              </td>
-              <td><strong>${card.front}</strong></td>
-              <td>${card.back}</td>
-              <td><span class="tag">${langLabel(card.language)}</span></td>
-              <td><span class="tag">${card.tag === "vocabulary" ? "Vokabel" : "Phrase"}</span></td>
-              <td><span class="tag">${statusOf(card)}</span></td>
-              <td>${fmtDate(card.addedAt)}</td>
-              <td>${fmtDate(card.dueAt)}</td>
-              <td><button class="btn ghost" data-delete-id="${card.id}">Löschen</button></td>
-            </tr>`).join("")
+        ? cards
+            .map(
+                (card) => `
+                    <tr>
+                        <td>
+                            <input
+                                type="checkbox"
+                                class="row-checkbox"
+                                data-id="${card.id}"
+                                ${state.selectedIds.has(card.id) ? "checked" : ""}
+                            />
+                        </td>
+                        <td><strong>${card.front}</strong></td>
+                        <td>${card.back}</td>
+                        <td><span class="tag">${langLabel(card.language)}</span></td>
+                        <td>
+                            <span class="tag">
+                                ${card.tag === "vocabulary" ? "Vokabel" : "Phrase"}
+                            </span>
+                        </td>
+                        <td><span class="tag">${statusOf(card)}</span></td>
+                        <td>${fmtDate(card.addedAt)}</td>
+                        <td>${fmtDate(card.dueAt)}</td>
+                        <td>
+                            <button
+                                class="btn ghost"
+                                data-delete-id="${card.id}"
+                                type="button"
+                            >
+                                Löschen
+                            </button>
+                        </td>
+                    </tr>
+                `,
+            )
+            .join("")
         : '<tr><td colspan="9" class="empty">Keine Vokabeln gefunden.</td></tr>';
 }
 
@@ -320,34 +444,48 @@ function renderTable() {
 function renderFlashcard() {
     const queue = nextQueue();
     const card = queue[state.currentCardIndex] || queue[0];
-
     const total = queue.length;
-    const current = state.currentCardIndex + 1;
-    const percent = total ? Math.round((current / total) * 100) : 0;
-    el("#flashProgressFill").style.width = `${percent}%`;
-    el("#flashProgressLabel").textContent = total
-        ? `${current} von ${total} Karten`
-        : '0 von 0 Karten';
+
+    console.log("Flashcard:", {
+        card,
+        context: card?.context,
+        note: card?.note,
+        example: card?.example,
+        tip: card?.tip,
+        detailsHidden: el("#flashDetails")?.hidden
+    });
 
     if (!card) {
-        const allCards = state.cards.filter(c => {
+        resetFlashcardView();
+
+        const allCards = state.cards.filter((item) => {
             if (state.flashLang === "all") return true;
-            if (state.flashLang === "german") return c.language === "german" || c.language === "deutsch";
-            return c.language === state.flashLang;
+
+            if (state.flashLang === "german") {
+                return (
+                    item.language === "german" ||
+                    item.language === "deutsch"
+                );
+            }
+
+            return item.language === state.flashLang;
         });
 
         const nextDue = allCards
-            .filter(c => new Date(c.dueAt) > now())
+            .filter((item) => new Date(item.dueAt) > now())
             .sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt))[0];
 
-        let icon, headline, subtext;
+        let icon;
+        let headline;
+        let subtext;
 
         if (allCards.length === 0) {
             icon = "📭";
             headline = "Noch keine Vokabeln vorhanden.";
-            subtext = state.flashLang === "all"
-                ? "Markiere Wörter im Browser um zu starten."
-                : `Noch keine ${langLabel(state.flashLang)} Vokabeln. Filter ändern oder Wörter markieren.`;
+            subtext =
+                state.flashLang === "all"
+                    ? "Markiere Wörter im Browser, um zu starten."
+                    : `Noch keine ${langLabel(state.flashLang)} Vokabeln. Filter ändern oder Wörter markieren.`;
         } else if (nextDue) {
             icon = "🎉";
             headline = "Alle fälligen Karten gelernt!";
@@ -355,7 +493,8 @@ function renderFlashcard() {
         } else {
             icon = "🔍";
             headline = "Keine Karten mit diesem Filter.";
-            subtext = "Ändere die Sprachauswahl oder deaktiviere 'Nur fällige Karten'.";
+            subtext =
+                "Ändere die Sprachauswahl oder deaktiviere „Nur fällige Karten“.";
         }
 
         el("#flashEmpty").style.display = "flex";
@@ -365,27 +504,39 @@ function renderFlashcard() {
         el("#flashEmptySubtext").textContent = subtext;
         el("#flashProgressFill").style.width = "0%";
         el("#flashProgressLabel").textContent = "0 von 0 Karten";
+
         return;
     }
+
+    const index = queue.indexOf(card) + 1;
+    const percent = Math.round((index / total) * 100);
 
     el("#flashEmpty").style.display = "none";
     el("#flashCard").style.display = "block";
 
-    const index = queue.indexOf(card) + 1;
+    el("#flashProgressFill").style.width = `${percent}%`;
+    el("#flashProgressLabel").textContent = `${index} von ${total} Karten`;
+
     el("#flashFront").textContent = card.front;
-    el("#flashContext").textContent = card.context || "Kein Satzkontext gespeichert.";
-    el("#flashBack").textContent = card.back || '–';
-    el("#flashType").textContent = card.tag === 'vocabulary' ? 'Vokabel' : 'Phrase';
+    el("#flashContext").textContent =
+        card.context || "Kein Satzkontext gespeichert.";
+    el("#flashBack").textContent = card.back || "–";
+    el("#flashType").textContent =
+        card.tag === "vocabulary" ? "Vokabel" : "Phrase";
     el("#flashStatus").textContent = statusOf(card);
-    el("#flashProgress").textContent = `${index} / ${queue.length}`;
-    el("#flashLanguage").textContent = langLabel(card.language) || '–';
-    el("#flashMeaning").textContent = card.note || '–';
-    el("#flashExample").textContent = card.example || '–';
-    el("#flashTip").textContent = card.tip || '–';
-    el("#flashCard").classList.remove("flipped");
+    el("#flashProgress").textContent = `${index} / ${total}`;
+    el("#flashLanguage").textContent = langLabel(card.language) || "–";
+    el("#flashMeaning").textContent = card.note || "–";
+    el("#flashExample").textContent = card.example || "–";
+    el("#flashTip").textContent = card.tip || "–";
+
+    resetFlashcardView();
 
     if (state.autoFlip) {
-        setTimeout(() => el("#flashCard").classList.add("flipped"), 15000);
+        state.autoFlipTimer = setTimeout(() => {
+            el("#flashCard").classList.add("flipped");
+            state.autoFlipTimer = null;
+        }, 15000);
     }
 }
 
@@ -400,183 +551,273 @@ function rerender() {
 async function applyReview(kind) {
     const queue = nextQueue();
     const card = queue[state.currentCardIndex] || queue[0];
+
     if (!card) return;
 
     try {
-        const res = await fetch(`${API_BASE}/vocabulary/${card.id}/review`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rating: kind })
-        });
+        const res = await fetch(
+            `${API_BASE}/vocabulary/${card.id}/review`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rating: kind }),
+            },
+        );
+
+        if (!res.ok) {
+            throw new Error(`Review fehlgeschlagen: ${res.status}`);
+        }
 
         const updated = await res.json();
 
         card.interval = updated.interval_days;
         card.ease_factor = updated.ease_factor;
         card.reviews = updated.review_count;
+        card.review_count = updated.review_count;
         card.mastered = updated.mastered;
         card.dueAt = updated.next_review;
 
+        await chrome.storage.local.set({ vocabCache: state.cards });
+
         const newQueue = nextQueue();
-        state.currentCardIndex = newQueue.length > 0
+
+        state.currentCardIndex = newQueue.length
             ? state.currentCardIndex % newQueue.length
             : 0;
 
         rerender();
     } catch (err) {
-        console.error('Review Fehler:', err);
+        console.error("Review Fehler:", err);
     }
 }
 
 // ── Event Listener: Navigation ────────────────────────────────
-els(".nav button").forEach((btn) =>
-    btn.addEventListener("click", () => setPanel(btn.dataset.panel))
-);
-els("[data-panel-jump]").forEach((btn) =>
-    btn.addEventListener("click", () => setPanel(btn.dataset.panelJump))
-);
-el("#mobileNavBtn").addEventListener("click", () =>
-    el("#nav").classList.toggle("open")
-);
+els(".nav button").forEach((button) => {
+    button.addEventListener("click", () => setPanel(button.dataset.panel));
+});
+
+els("[data-panel-jump]").forEach((button) => {
+    button.addEventListener("click", () =>
+        setPanel(button.dataset.panelJump),
+    );
+});
+
+el("#mobileNavBtn").addEventListener("click", () => {
+    el("#nav").classList.toggle("open");
+});
 
 // ── Event Listener: Theme ─────────────────────────────────────
 el("#themeToggle").addEventListener("click", () => {
     state.theme = state.theme === "light" ? "dark" : "light";
+
     document.documentElement.setAttribute("data-theme", state.theme);
-    el("#darkSwitch").classList.toggle("active", state.theme === "dark");
+    el("#darkSwitch").classList.toggle(
+        "active",
+        state.theme === "dark",
+    );
+
     persistState();
 });
-el("#darkSwitch").addEventListener("click", () => el("#themeToggle").click());
 
-// ── Event Listener: Settings Switches ────────────────────────
-el("#dueOnlySwitch").addEventListener("click", (e) => {
+el("#darkSwitch").addEventListener("click", () => {
+    el("#themeToggle").click();
+});
+
+// ── Event Listener: Settings ──────────────────────────────────
+el("#dueOnlySwitch").addEventListener("click", (event) => {
     state.dueOnly = !state.dueOnly;
-    e.currentTarget.classList.toggle("active", state.dueOnly);
+
+    event.currentTarget.classList.toggle("active", state.dueOnly);
+
+    state.currentCardIndex = 0;
+
     persistState();
     rerender();
 });
 
-el("#autoFlipSwitch").addEventListener("click", (e) => {
+el("#autoFlipSwitch").addEventListener("click", (event) => {
     state.autoFlip = !state.autoFlip;
-    e.currentTarget.classList.toggle("active", state.autoFlip);
+
+    event.currentTarget.classList.toggle("active", state.autoFlip);
+
     persistState();
     renderFlashcard();
 });
 
-el("#highlightSwitch").addEventListener("click", (e) => {
+el("#highlightSwitch").addEventListener("click", (event) => {
     state.highlightEnabled = !state.highlightEnabled;
-    e.currentTarget.classList.toggle("active", state.highlightEnabled);
+
+    event.currentTarget.classList.toggle(
+        "active",
+        state.highlightEnabled,
+    );
+
     persistState();
-    // content.js per Message informieren
+
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]) {
             chrome.tabs.sendMessage(tabs[0].id, {
-                action: 'setHighlight',
-                enabled: state.highlightEnabled
+                action: "setHighlight",
+                enabled: state.highlightEnabled,
             });
         }
     });
 });
 
-el("#targetLangSelect").addEventListener("change", (e) => {
-    chrome.storage.local.set({ targetLang: e.target.value });
+el("#targetLangSelect").addEventListener("change", (event) => {
+    chrome.storage.local.set({ targetLang: event.target.value });
 });
 
-// ── Event Listener: Flashcard ─────────────────────────────────
-el("#flipBtn").addEventListener("click", () =>
-    el("#flashCard").classList.toggle("flipped")
-);
+// ── Event Listener: Flashcards ────────────────────────────────
+el("#flipBtn").addEventListener("click", () => {
+    el("#flashCard").classList.toggle("flipped");
+});
+
+el("#backToFrontBtn").addEventListener("click", () => {
+    el("#flashCard").classList.remove("flipped");
+});
+
+el("#detailsBtn").addEventListener("click", () => {
+    const details = el("#flashDetails");
+    const isHidden = details.hidden;
+
+    details.hidden = !isHidden;
+
+    el("#detailsBtn").setAttribute("aria-expanded", String(isHidden));
+
+    el("#detailsBtn").textContent = isHidden
+        ? "Kontext und Erklärung ausblenden"
+        : "Kontext und Erklärung anzeigen";
+});
+
 el("#nextBtn").addEventListener("click", () => {
-    const q = nextQueue();
-    if (!q.length) return;
-    state.currentCardIndex = (state.currentCardIndex + 1) % q.length;
+    const queue = nextQueue();
+
+    if (!queue.length) return;
+
+    state.currentCardIndex =
+        (state.currentCardIndex + 1) % queue.length;
+
     renderFlashcard();
 });
-els("[data-review]").forEach((btn) =>
-    btn.addEventListener("click", () => applyReview(btn.dataset.review))
-);
-el("#flashLangSelect").addEventListener("change", (e) => {
-    state.flashLang = e.target.value;
+
+els("[data-review]").forEach((button) => {
+    button.addEventListener("click", () => applyReview(button.dataset.review));
+});
+
+el("#flashLangSelect").addEventListener("change", (event) => {
+    state.flashLang = event.target.value;
     state.currentCardIndex = 0;
+
     persistState();
     renderFlashcard();
 });
 
-// ── Event Listener: Vokabeln Filter ──────────────────────────
-el("#filterStatus").addEventListener("change", (e) => {
-    state.filters.status = e.target.value;
-    state.selectedIds.clear();
-    renderTable();
-});
-el("#filterType").addEventListener("change", (e) => {
-    state.filters.type = e.target.value;
-    state.selectedIds.clear();
-    renderTable();
-});
-el("#filterLang").addEventListener("change", (e) => {
-    state.filters.lang = e.target.value;
-    state.selectedIds.clear();
-    renderTable();
-});
-el("#filterSearch").addEventListener("input", (e) => {
-    state.filters.search = e.target.value;
+// ── Event Listener: Vokabel-Filter ────────────────────────────
+el("#filterStatus").addEventListener("change", (event) => {
+    state.filters.status = event.target.value;
     state.selectedIds.clear();
     renderTable();
 });
 
-// ── Event Listener: Checkboxen & Bulk ────────────────────────
-el("#selectAll").addEventListener("change", (e) => {
+el("#filterType").addEventListener("change", (event) => {
+    state.filters.type = event.target.value;
+    state.selectedIds.clear();
+    renderTable();
+});
+
+el("#filterLang").addEventListener("change", (event) => {
+    state.filters.lang = event.target.value;
+    state.selectedIds.clear();
+    renderTable();
+});
+
+el("#filterSearch").addEventListener("input", (event) => {
+    state.filters.search = event.target.value;
+    state.selectedIds.clear();
+    renderTable();
+});
+
+// ── Event Listener: Checkboxen und Bulk ───────────────────────
+el("#selectAll").addEventListener("change", (event) => {
     const cards = filteredCards();
-    if (e.target.checked) {
-        cards.forEach(c => state.selectedIds.add(c.id));
+
+    if (event.target.checked) {
+        cards.forEach((card) => state.selectedIds.add(card.id));
     } else {
         state.selectedIds.clear();
     }
+
     renderTable();
 });
 
-el("#vocabTable").addEventListener("change", (e) => {
-    if (!e.target.classList.contains("row-checkbox")) return;
-    const id = parseInt(e.target.dataset.id);
-    if (e.target.checked) {
+el("#vocabTable").addEventListener("change", (event) => {
+    if (!event.target.classList.contains("row-checkbox")) return;
+
+    const id = Number(event.target.dataset.id);
+
+    if (event.target.checked) {
         state.selectedIds.add(id);
     } else {
         state.selectedIds.delete(id);
     }
+
     renderTable();
 });
 
 el("#bulkSelectAll").addEventListener("click", () => {
-    filteredCards().forEach(c => state.selectedIds.add(c.id));
+    filteredCards().forEach((card) => state.selectedIds.add(card.id));
+
     el("#selectAll").checked = true;
+
     renderTable();
 });
 
 el("#bulkDelete").addEventListener("click", async () => {
     if (!state.selectedIds.size) return;
-    if (!confirm(`${state.selectedIds.size} Vokabeln wirklich löschen?`)) return;
+
+    if (!confirm(`${state.selectedIds.size} Vokabeln wirklich löschen?`)) {
+        return;
+    }
+
     try {
         await Promise.all(
-            [...state.selectedIds].map(id =>
-                fetch(`${API_BASE}/vocabulary/${id}`, { method: "DELETE" })
-            )
+            [...state.selectedIds].map((id) =>
+                fetch(`${API_BASE}/vocabulary/${id}`, {
+                    method: "DELETE",
+                }),
+            ),
         );
+
         state.selectedIds.clear();
+
         await loadVocabulary();
     } catch (err) {
         console.error("Bulk-Löschen fehlgeschlagen:", err);
     }
 });
 
-// ── Event Listener: Einzeln löschen (Event Delegation) ───────
-el("#vocabTable").addEventListener("click", async (e) => {
-    const btn = e.target.closest("[data-delete-id]");
-    if (!btn) return;
-    const id = parseInt(btn.dataset.deleteId);
+// ── Event Listener: Einzelnes Löschen ─────────────────────────
+el("#vocabTable").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-delete-id]");
+
+    if (!button) return;
+
+    const id = Number(button.dataset.deleteId);
+
     if (!confirm("Diese Vokabel wirklich löschen?")) return;
+
     try {
-        await fetch(`${API_BASE}/vocabulary/${id}`, { method: "DELETE" });
+        const res = await fetch(`${API_BASE}/vocabulary/${id}`, {
+            method: "DELETE",
+        });
+
+        if (!res.ok) {
+            throw new Error(`Löschen fehlgeschlagen: ${res.status}`);
+        }
+
         state.selectedIds.delete(id);
+
         await loadVocabulary();
     } catch (err) {
         console.error("Löschen fehlgeschlagen:", err);
@@ -584,9 +825,11 @@ el("#vocabTable").addEventListener("click", async (e) => {
 });
 
 // ── Live Update von content.js ────────────────────────────────
-if (typeof chrome !== 'undefined' && chrome.runtime) {
+if (typeof chrome !== "undefined" && chrome.runtime) {
     chrome.runtime.onMessage.addListener((message) => {
-        if (message.action === 'vocabAdded') loadVocabulary();
+        if (message.action === "vocabAdded") {
+            loadVocabulary();
+        }
     });
 }
 
