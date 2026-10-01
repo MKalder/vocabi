@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="de" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VocAbi</title>
+    <link rel="preconnect" href="https://api.fontshare.com" />
+    <link
+      href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+    <a
+      href="#main"
+      style="position: absolute; left: -9999px; top: auto"
+      onfocus="
+        this.style.left = '1rem';
+        this.style.top = '1rem';
+        this.style.zIndex = '999';
+      "
+      >Zum Inhalt springen</a
+    >
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <img id="svg" src="/icons/icon128.png" />
+          <div class="brand-meta">
+            <h1>VocAbi</h1>
+            <p>Spaced Repetition für deinen Alltag</p>
+          </div>
+        </div>
+        <button
+          class="mobile-toggle"
+          id="mobileNavBtn"
+          aria-label="Navigation öffnen"
+        >
+          ☰
+        </button>
+        <nav class="nav open" id="nav">
+          <button class="active" data-panel="dashboard">
+            <span>Dashboard</span>
+          </button>
+          <button data-panel="vocab"><span>Vokabeln</span></button>
+          <button data-panel="flashcards"><span>Flash Cards</span></button>
+          <button data-panel="settings"><span>Settings</span></button>
+        </nav>
+        <div class="sidebar-card">
+          <h2>Heute fällig</h2>
+          <p><span id="dueNow">0</span> Karten warten auf Wiederholung.</p>
+        </div>
+      </aside>
+
+      <main class="main" id="main">
+        <div class="topbar">
+          <div class="topbar-left">
+            <h2 id="pageTitle">Dashboard</h2>
+            <p id="pageSubtitle">
+              Behalte Fortschritt, Lernstand und nächste Wiederholungen im
+              Blick.
+            </p>
+          </div>
+          <div class="topbar-actions">
+            <button
+              class="icon-btn"
+              id="themeToggle"
+              aria-label="Theme wechseln"
+            >
+              ◐
+            </button>
+            <button class="btn primary" data-panel-jump="flashcards">
+              Lernmodus starten
+            </button>
+          </div>
+        </div>
+
+        <!-- DASHBOARD PANEL -->
+        <section class="panel active" id="panel-dashboard">
+          <div class="grid kpis">
+            <article class="card pad kpi">
+              <div class="label">Gesamt</div>
+              <div class="value" id="kpiTotal">0</div>
+              <div class="meta">Alle gespeicherten Vokabeln</div>
+            </article>
+            <article class="card pad kpi">
+              <div class="label">Markiert</div>
+              <div class="value" id="kpiDone">0</div>
+              <div class="meta">Schon sicher markiert</div>
+            </article>
+            <article class="card pad kpi">
+              <div class="label">Zu lernen</div>
+              <div class="value" id="kpiLearning">0</div>
+              <div class="meta">Noch offen oder unsicher</div>
+            </article>
+            <article class="card pad kpi">
+              <div class="label">Heute fällig</div>
+              <div class="value" id="kpiDue">0</div>
+              <div class="meta">Wiederholungen im SR-Modus</div>
+            </article>
+          </div>
+
+          <div class="grid two-col">
+            <article class="card pad">
+              <div class="section-head">
+                <div>
+                  <h3>Zuletzt hinzugefügt</h3>
+                  <p>Mit Datum und Lernstatus</p>
+                </div>
+                <button class="btn ghost" data-panel-jump="vocab">
+                  Alle sehen
+                </button>
+              </div>
+              <div class="list" id="recentList"></div>
+            </article>
+
+            <article class="card pad">
+              <div class="section-head">
+                <div>
+                  <h3>Nächste Reviews</h3>
+                  <p>Berechnet per Spaced Repetition</p>
+                </div>
+              </div>
+              <div class="list" id="dueList"></div>
+            </article>
+          </div>
+        </section>
+
+        <!-- VOKABELN PANEL -->
+        <section class="panel" id="panel-vocab">
+          <article class="card pad">
+            <!-- Filter-Leiste -->
+            <div class="vocab-filters">
+              <div class="filter-group">
+                <label for="filterStatus">Status</label>
+                <select id="filterStatus">
+                  <option value="all">Alle</option>
+                  <option value="new">Neu</option>
+                  <option value="learning">Lernen</option>
+                  <option value="mastered">Markiert</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="filterType">Typ</label>
+                <select id="filterType">
+                  <option value="all">Alle</option>
+                  <option value="vocabulary">Vokabel</option>
+                  <option value="phrase">Phrase</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="filterLang">Zielsprache</label>
+                <select id="filterLang">
+                  <option value="all">Alle Sprachen</option>
+                  <option value="english">Englisch</option>
+                  <option value="german">Deutsch</option>
+                  <option value="french">Französisch</option>
+                  <option value="spanish">Spanisch</option>
+                  <option value="thai">Thailändisch</option>
+                </select>
+              </div>
+              <div class="filter-group filter-search">
+                <label for="filterSearch">Suche</label>
+                <input
+                  id="filterSearch"
+                  type="text"
+                  placeholder="Vokabel suchen..."
+                />
+              </div>
+            </div>
+
+            <!-- Bulk-Aktionen -->
+            <div class="bulk-actions" id="bulkActions" style="display: none">
+              <span id="bulkCount">0 ausgewählt</span>
+              <button class="btn ghost" id="bulkSelectAll">
+                Alle auswählen
+              </button>
+              <button class="btn danger" id="bulkDelete">
+                Auswahl löschen
+              </button>
+            </div>
+
+            <!-- Tabelle -->
+            <div class="section-head" style="margin-top: var(--space-4)">
+              <div>
+                <h3>Vokabelliste</h3>
+                <p id="vocabCount">0 Einträge</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 40px">
+                      <input
+                        type="checkbox"
+                        id="selectAll"
+                        title="Alle auswählen"
+                      />
+                    </th>
+                    <th>Vokabel</th>
+                    <th>Bedeutung</th>
+                    <th>Sprache</th>
+                    <th>Typ</th>
+                    <th>Status</th>
+                    <th>Hinzugefügt</th>
+                    <th>Nächste Review</th>
+                    <th>Löschen</th>
+                  </tr>
+                </thead>
+                <tbody id="vocabTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <!-- FLASHCARDS PANEL -->
+        <section class="panel" id="panel-flashcards">
+          <div class="flash-shell">
+            <!-- Sprachfilter -->
+            <div class="flash-lang-filter">
+              <label for="flashLangSelect">Sprache</label>
+              <select id="flashLangSelect">
+                <option value="all">Alle Sprachen</option>
+                <option value="english">Englisch</option>
+                <option value="german">Deutsch</option>
+                <option value="french">Französisch</option>
+                <option value="spanish">Spanisch</option>
+                <option value="thai">Thailändisch</option>
+              </select>
+            </div>
+
+            <!-- Empty State -->
+            <div class="flash-empty" id="flashEmpty" style="display: none">
+              <div class="flash-empty-icon" id="flashEmptyIcon">🎉</div>
+              <h3 id="flashEmptyTitle">Queue leer</h3>
+              <p id="flashEmptySubtext">Keine Karten verfügbar.</p>
+            </div>
+
+            <!-- Flashcard -->
+            <article class="flash-card card" id="flashCard">
+              <div class="flash-card-inner" id="flashCardInner">
+                <!-- Vorderseite -->
+                <div class="flash-face front">
+                  <div class="flash-top">
+                    <span id="flashStatus">Keine Karte geladen</span>
+                    <span id="flashProgress">0 / 0</span>
+                  </div>
+                  <div class="flash-type" id="flashType">–</div>
+                  <div class="flash-word" id="flashFront">
+                    Starte den Lernmodus.
+                  </div>
+                  <div class="flash-context">
+                    <span class="flash-context-label">Kontext</span>
+                    <p id="flashContext">–</p>
+                  </div>
+                  <p class="flash-hint">
+                    Karte umdrehen und anschließend bewerten.
+                  </p>
+                  <div class="flash-actions">
+                    <button class="btn" id="flipBtn">Karte drehen</button>
+                    <button class="btn primary" id="nextBtn">
+                      Nächste Karte
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Rückseite -->
+                <div class="flash-face back">
+                  <div class="flash-top">
+                    <span>Lösung</span>
+                    <span id="flashLanguage">–</span>
+                  </div>
+                  <div class="flash-word" id="flashBack">
+                    Noch keine Antwort
+                  </div>
+                  <div class="flash-details">
+                    <p class="flash-detail-row">
+                      <strong>Bedeutung:</strong>
+                      <span id="flashMeaning">–</span>
+                    </p>
+                    <p class="flash-detail-row">
+                      <strong>Beispiel:</strong>
+                      <span id="flashExample">–</span>
+                    </p>
+                    <p class="flash-detail-row">
+                      <strong>Tipp:</strong> <span id="flashTip">–</span>
+                    </p>
+                  </div>
+                  <div class="review-buttons">
+                    <button class="btn hard" data-review="hard">Schwer</button>
+                    <button class="btn medium" data-review="good">Gut</button>
+                    <button class="btn easy" data-review="easy">Leicht</button>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <!-- Fortschrittsbalken -->
+            <div class="flash-progress-bar-wrap">
+              <div class="flash-progress-bar-track">
+                <div
+                  class="flash-progress-bar-fill"
+                  id="flashProgressFill"
+                ></div>
+              </div>
+              <p class="flash-progress-label" id="flashProgressLabel">
+                0 von 0 Karten heute
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- SETTINGS PANEL -->
+        <section class="panel" id="panel-settings">
+          <div class="grid two-col">
+            <article class="card pad">
+              <div class="section-head">
+                <div>
+                  <h3>Settings</h3>
+                  <p>Steuere Theme, Session und Lernrhythmus</p>
+                </div>
+              </div>
+              <div class="settings-list">
+                <div class="setting-row">
+                  <div class="setting-copy">
+                    <h4>Dark Mode</h4>
+                    <p>Manuell umschaltbar für längere Lernsessions.</p>
+                  </div>
+                  <button
+                    class="switch"
+                    id="darkSwitch"
+                    aria-label="Dark Mode umschalten"
+                  >
+                    <span></span>
+                  </button>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-copy">
+                    <h4>Nur fällige Karten</h4>
+                    <p>
+                      Zeigt im Lernmodus ausschließlich Karten mit aktuellem
+                      Review-Datum.
+                    </p>
+                  </div>
+                  <button
+                    class="switch active"
+                    id="dueOnlySwitch"
+                    aria-label="Fällige Karten filtern"
+                  >
+                    <span></span>
+                  </button>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-copy">
+                    <h4>Automatisch drehen</h4>
+                    <p>Optional für schnellen Drill nach 15 Sekunden.</p>
+                  </div>
+                  <button
+                    class="switch"
+                    id="autoFlipSwitch"
+                    aria-label="Auto Flip umschalten"
+                  >
+                    <span></span>
+                  </button>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-copy">
+                    <h4>Wort-Highlighting</h4>
+                    <p>Markiert bekannte Vokabeln farbig auf Webseiten.</p>
+                  </div>
+                  <button
+                    class="switch active"
+                    id="highlightSwitch"
+                    aria-label="Highlighting umschalten"
+                  >
+                    <span></span>
+                  </button>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-copy">
+                    <h4>Zielsprache</h4>
+                    <p>In welche Sprache VocAbi übersetzen soll.</p>
+                  </div>
+                  <select id="targetLangSelect">
+                    <option value="english">Englisch</option>
+                    <option value="german">Deutsch</option>
+                    <option value="french">Französisch</option>
+                    <option value="spanish">Spanisch</option>
+                    <option value="thai">Thailändisch</option>
+                  </select>
+                </div>
+              </div>
+            </article>
+
+            <article class="card pad">
+              <div class="section-head">
+                <div>
+                  <h3>Deine Lernstatistik</h3>
+                  <p>Live berechnet aus deinem Spaced-Repetition-Fortschritt</p>
+                </div>
+              </div>
+              <div class="list">
+                <div class="word-row">
+                  <span class="status-dot new"></span>
+                  <div class="word-main">
+                    <strong>Durchschnittlicher Ease Factor</strong>
+                    <span>Wie leicht dir Karten im Schnitt fallen.</span>
+                  </div>
+                  <span class="tag" id="statAvgEase">–</span>
+                </div>
+                <div class="word-row">
+                  <span class="status-dot"></span>
+                  <div class="word-main">
+                    <strong>Durchschnittliches Intervall</strong>
+                    <span>Mittlerer Abstand bis zur nächsten Review.</span>
+                  </div>
+                  <span class="tag" id="statAvgInterval">–</span>
+                </div>
+                <div class="word-row">
+                  <span class="status-dot done"></span>
+                  <div class="word-main">
+                    <strong>Gemeistert</strong>
+                    <span
+                      >Karten mit hohem Ease Factor und langem Intervall.</span
+                    >
+                  </div>
+                  <span class="tag" id="statMastered">–</span>
+                </div>
+                <div class="word-row">
+                  <span class="status-dot new"></span>
+                  <div class="word-main">
+                    <strong>Noch nie wiederholt</strong>
+                    <span>Frisch hinzugefügte Karten ohne Review.</span>
+                  </div>
+                  <span class="tag" id="statNeverReviewed">–</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="dashboard.js"></script>
+  </body>
+</html>
