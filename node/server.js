@@ -17,6 +17,7 @@ app.use((req, res, next) => {
 
 app.get('/', (req, res) => res.send('<h1>VocAbi Running</h1>'));
 app.use('/translate', translateRouter);
+//TODO
 app.use('/vocabulary', vocabularyRouter);
 
 await startWorker();
